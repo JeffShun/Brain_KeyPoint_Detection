@@ -1,0 +1,6 @@
+-i https://repos.infervision.com/repository/pypi/simple
+scipy==1.2.0
+simpleitk==1.2.2-labelset
+starship>=0.4.1
+starship.umtf>=0.4.1
+torchgeometry==0.1.2

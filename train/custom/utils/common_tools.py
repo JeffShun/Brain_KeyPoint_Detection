@@ -1,0 +1,147 @@
+import random
+import torch
+from torch.nn import functional as F
+import math
+import numpy as np
+
+class Compose(object):
+
+    """Composes several transforms together.
+    Args:
+        transforms (list of ``Transform`` objects): list of transforms to compose.
+    """
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, img, mask):
+        for t in self.transforms:
+            img = t(img, mask)
+        return img, mask
+
+    def __repr__(self):
+        format_string = self.__class__.__name__ + '('
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
+        return format_string
+
+# 数据预处理工具
+""""
+img.shape = [C,H,W,D], mask.shape = [C,H,W,D]
+"""
+class to_tensor(object):
+    def __call__(self, img, mask):
+        img_o = torch.from_numpy(img).float()
+        mask_o = torch.from_numpy(mask).float()
+        return img_o, mask_o
+
+class normlize(object):
+    def __init__(self, win_clip=None):
+        self.win_clip = win_clip
+
+    def __call__(self, img, mask):
+        ori_shape = img.shape
+        img_o = img.view(ori_shape[0], -1)
+        if self.win_clip is not None:
+            img_o = torch.clip(img_o, self.win_clip[0], self.win_clip[1])
+        img_min = img_o.min(dim=-1,keepdim=True)[0]
+        img_max = img_o.max(dim=-1,keepdim=True)[0]
+        img_o = (img_o - img_min)/(img_max - img_min)
+        img_o = img_o.view(ori_shape)
+        mask_o = mask
+        return img_o, mask_o
+
+class random_flip(object):
+    def __init__(self, axis=0, prob=0.5):
+        assert isinstance(axis, int) and axis in [1,2,3]
+        self.axis = axis
+        self.prob = prob
+    def __call__(self, img, mask):
+        if random.random() < self.prob:
+            img_o = torch.flip(img, axis=self.axis)
+            mask_o = torch.flip(mask, axis=self.axis)
+        return img_o, mask_o
+
+class random_rotate3d(object):
+    def __init__(self,
+                 prob=0.5, 
+                 x_theta_range=[-180,180], 
+                 y_theta_range=[-180,180], 
+                 z_theta_range=[-180,180]
+                 ):
+        self.prob = prob
+        self.x_theta_range = x_theta_range
+        self.y_theta_range = y_theta_range
+        self.z_theta_range = z_theta_range
+
+    def _rotate3d(self, data, angles=[0,0,0], itp_mode="bilinear"): 
+        alpha, beta, gama = [(angle/180)*math.pi for angle in angles]
+        transform_matrix = torch.tensor([
+            [math.cos(beta)*math.cos(gama), math.sin(alpha)*math.sin(beta)*math.cos(gama)-math.sin(gama)*math.cos(alpha), math.sin(beta)*math.cos(alpha)*math.cos(gama)+math.sin(alpha)*math.sin(gama), 0],
+            [math.cos(beta)*math.sin(gama), math.cos(alpha)*math.cos(gama)+math.sin(alpha)*math.sin(beta)*math.sin(gama), -math.sin(alpha)*math.cos(gama)+math.sin(gama)+math.sin(beta)*math.cos(alpha), 0],
+            [-math.sin(beta), math.sin(alpha)*math.cos(beta),math.cos(alpha)*math.cos(beta), 0]
+            ])
+        # 旋转变换矩阵
+        transform_matrix = transform_matrix.unsqueeze(0)
+        # 为了防止形变，先将原图padding为正方体，变换完成后再切掉
+        data = data.unsqueeze(0)
+        data_size = data.shape[2:]
+        pad_x = (max(data_size)-data_size[0])//2
+        pad_y = (max(data_size)-data_size[1])//2
+        pad_z = (max(data_size)-data_size[2])//2
+        pad = [pad_z,pad_z,pad_y,pad_y,pad_x,pad_x]
+        pad_data = F.pad(data, pad=pad, mode="constant",value=0).to(torch.float32)
+        grid = F.affine_grid(transform_matrix, pad_data.shape)
+        output = F.grid_sample(pad_data, grid, mode=itp_mode)
+        output = output.squeeze(0)
+        output = output[:,pad_x:output.shape[1]-pad_x, pad_y:output.shape[2]-pad_y, pad_z:output.shape[3]-pad_z]
+        return output
+    
+    def __call__(self, img, mask):
+        if random.random() < self.prob:
+            random_angle_x = random.random()*(self.x_theta_range[1]-self.x_theta_range[0])+self.x_theta_range[0]
+            random_angle_y = random.random()*(self.y_theta_range[1]-self.y_theta_range[0])+self.y_theta_range[0]
+            random_angle_z = random.random()*(self.z_theta_range[1]-self.z_theta_range[0])+self.z_theta_range[0]    
+            img_o = self._rotate3d(img,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="bilinear")
+            mask_o = self._rotate3d(mask,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="nearest")
+        return img_o, mask_o
+
+
+class GeneralTools():
+    @ staticmethod
+    def gaussian_smooth3d(img, kernel_size=3, sigma=1.0): 
+        """
+        gaussian smooth a image of type torch tensor and with shape [C,H,D,W]
+        """
+        img = img.unsqueeze(0)
+        # 生成高斯核
+        assert sigma > 0
+        X = torch.linspace(-sigma*3, sigma*3, kernel_size)
+        Y = torch.linspace(-sigma*3, sigma*3, kernel_size)
+        Z = torch.linspace(-sigma*3, sigma*3, kernel_size)
+        x, y, z = torch.meshgrid(X,Y,Z)
+        gauss_kernel = 1/(2*np.pi*sigma**2) * np.exp(-(x**2 + y**2 + z**2)/(2*sigma**2))
+        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+        gauss_kernel = torch.FloatTensor(gauss_kernel).unsqueeze(0).unsqueeze(0).to(img.device).type_as(img)
+        gauss_kernel = gauss_kernel.repeat(1, img.shape[1], 1, 1, 1)
+        weight = torch.nn.Parameter(data=gauss_kernel, requires_grad=False)
+        out = F.conv3d(img, weight, padding=kernel_size//2).squeeze(0)
+        return out    
+    
+    @ staticmethod
+    def mask_to_onehot(mask, num_classes): 
+        """
+        Converts a mask (H, W) to (C, H, W)
+        """
+        _mask = [mask == i for i in range(num_classes)]
+        mask = np.array(_mask).astype(np.uint8)
+        return mask
+
+    @ staticmethod
+    def onehot_to_mask(mask):
+        """
+        Converts a mask (H, W, C) to (H, W)
+        """
+        _mask = np.argmax(mask, axis=0).astype(np.uint8)
+        return _mask
