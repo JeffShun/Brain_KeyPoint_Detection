@@ -12,15 +12,15 @@ import yaml
 import random
 from scipy.ndimage import zoom
 from scipy.ndimage.filters import gaussian_filter
-from skimage.morphology import erosion, dilation
+from skimage.morphology import dilation
+from train.config.detect_keypoint_config import network_cfg
 
-from ..train.config.detect_keypoint_config import network_cfg
 
 class DetectKeypointConfig:
 
     def __init__(self, test_cfg):
         # 配置文件
-        self.th_prob = test_cfg.get('th_prob')
+        self.patch_size = test_cfg.get('patch_size')
 
     def __repr__(self) -> str:
         return str(self.__dict__)
@@ -37,8 +37,8 @@ class DetectKeypointModel:
 
 class DetectKeypointPredictor:
 
-    def __init__(self, gpu: int, model: DetectKeypointModel):
-        self.gpu = gpu
+    def __init__(self, device: str, model: DetectKeypointModel):
+        self.device = torch.device(device)
         self.model = model
 
         with open(self.model.config_f, 'r') as config_f:
@@ -57,16 +57,17 @@ class DetectKeypointPredictor:
     def load_model_jit(self) -> None:
         # 加载静态图
         from torch import jit
-        self.net = jit.load(self.model.model_f, map_location=f'cuda:{self.gpu}')
-        self.net.cuda(self.gpu).half()
+        self.net = jit.load(self.model.model_f, map_location=self.device)
+        self.net.eval()
+        self.net.to(self.device).half()
 
     def load_model_pth(self) -> None:
         # 加载动态图
         self.net = self.network_cfg.network
-        checkpoint = torch.load(self.model.model_f, map_location=f'cuda:{self.gpu}')
-        self.net.load_state_dict(checkpoint['state_dict'])
+        checkpoint = torch.load(self.model.model_f, map_location=self.device)
+        self.net.load_state_dict(checkpoint)
         self.net.eval()
-        self.net.cuda(self.gpu).half()
+        self.net.to(self.device).half()
 
     def _get_bbox(self, data, border_pad):
         shape = data.shape
@@ -92,8 +93,8 @@ class DetectKeypointPredictor:
         volume = torch.from_numpy(volume).float()[None, None]
         volume = self._resize_torch(volume, self.test_cfg.patch_size)
 
-        with torch.no_grad(), torch.cuda.device(self.gpu):
-            patch_gpu = volume.half().cuda()
+        with torch.no_grad():
+            patch_gpu = volume.half().to(self.device)
             kp_heatmap = self.net.forward_test(patch_gpu)
             kp_heatmap = self._resize_torch(kp_heatmap, shape)
             kp_arr = kp_heatmap.squeeze().cpu().detach().numpy()
@@ -101,11 +102,15 @@ class DetectKeypointPredictor:
             C = ori_shape[0]
             kp_arr = kp_arr.reshape(C,-1)
             max_index = np.argmax(kp_arr,1)
-            max_p = tuple(np.arange(C), max_index)
-            kp_mask = np.zeros_like(kp_arr)
+            max_p = (np.arange(C), max_index)
+            kp_mask = np.zeros_like(kp_arr, dtype="uint8")
             kp_mask[max_p] = 1
             kp_mask = kp_mask.reshape(ori_shape)
-        return kp_mask.astype('uint8')
+            out_mask = np.zeros(shape, dtype="uint8")
+            for i in range(kp_mask.shape[0]):
+                kp_dilate = dilation(kp_mask[i], np.ones([5, 5, 5]))
+                out_mask[kp_dilate==1] = i+1
+        return out_mask
 
     def _resize_torch(self, data, scale, mode="trilinear"):
         return torch.nn.functional.interpolate(data, size=scale, mode=mode)    

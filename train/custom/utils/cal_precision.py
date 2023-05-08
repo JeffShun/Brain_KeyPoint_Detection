@@ -6,7 +6,6 @@ import argparse
 import pandas as pd
 from multiprocessing import Pool
 import cc3d
-from bw_ocean.core.bw_algo import skeletonize_3d as skeletonize_3d
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))

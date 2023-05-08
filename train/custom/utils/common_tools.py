@@ -3,6 +3,8 @@ import torch
 from torch.nn import functional as F
 import math
 import numpy as np
+import logging
+from bisect import bisect_right
 
 class Compose(object):
 
@@ -15,7 +17,7 @@ class Compose(object):
 
     def __call__(self, img, mask):
         for t in self.transforms:
-            img = t(img, mask)
+            img, mask = t(img, mask)
         return img, mask
 
     def __repr__(self):
@@ -32,8 +34,8 @@ img.shape = [C,H,W,D], mask.shape = [C,H,W,D]
 """
 class to_tensor(object):
     def __call__(self, img, mask):
-        img_o = torch.from_numpy(img).float()
-        mask_o = torch.from_numpy(mask).float()
+        img_o = torch.from_numpy(img.astype("float32"))
+        mask_o = torch.from_numpy(mask.astype("float32"))
         return img_o, mask_o
 
 class normlize(object):
@@ -99,6 +101,7 @@ class random_rotate3d(object):
         return output
     
     def __call__(self, img, mask):
+        img_o, mask_o = img, mask
         if random.random() < self.prob:
             random_angle_x = random.random()*(self.x_theta_range[1]-self.x_theta_range[0])+self.x_theta_range[0]
             random_angle_y = random.random()*(self.y_theta_range[1]-self.y_theta_range[0])+self.y_theta_range[0]
@@ -107,6 +110,17 @@ class random_rotate3d(object):
             mask_o = self._rotate3d(mask,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="nearest")
         return img_o, mask_o
 
+class resize(object):
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, img, mask):
+        img_o = torch.nn.functional.interpolate(img[None], size=self.size, mode="trilinear") 
+        mask_o = torch.nn.functional.interpolate(mask[None], size=self.size, mode="nearest")
+        img_o = img_o.squeeze(0)
+        mask_o = mask_o.squeeze(0)
+        return img_o, mask_o
+        
 
 class GeneralTools():
     @ staticmethod
@@ -124,9 +138,9 @@ class GeneralTools():
         gauss_kernel = 1/(2*np.pi*sigma**2) * np.exp(-(x**2 + y**2 + z**2)/(2*sigma**2))
         gauss_kernel = gauss_kernel / gauss_kernel.sum()
         gauss_kernel = torch.FloatTensor(gauss_kernel).unsqueeze(0).unsqueeze(0).to(img.device).type_as(img)
-        gauss_kernel = gauss_kernel.repeat(1, img.shape[1], 1, 1, 1)
+        gauss_kernel = gauss_kernel.repeat(img.shape[1], 1, 1, 1, 1)
         weight = torch.nn.Parameter(data=gauss_kernel, requires_grad=False)
-        out = F.conv3d(img, weight, padding=kernel_size//2).squeeze(0)
+        out = F.conv3d(img, weight, padding=kernel_size//2, groups=img.shape[1]).squeeze(0)
         return out    
     
     @ staticmethod
@@ -134,7 +148,7 @@ class GeneralTools():
         """
         Converts a mask (H, W) to (C, H, W)
         """
-        _mask = [mask == i for i in range(num_classes)]
+        _mask = [mask == i for i in range(1, num_classes+1)]
         mask = np.array(_mask).astype(np.uint8)
         return mask
 
@@ -145,3 +159,73 @@ class GeneralTools():
         """
         _mask = np.argmax(mask, axis=0).astype(np.uint8)
         return _mask
+
+
+class Logger(object):
+    level_relations = {
+        'debug': logging.DEBUG,
+        'info' : logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL
+    }
+
+    def __init__(self,filename, level='info',
+                 fmt='%(asctime)s - %(levelname)s : %(message)s'):
+        #create a logger
+        self.logger = logging.getLogger()
+        self.logger.setLevel(self.level_relations.get(level))
+        format_str = logging.Formatter(fmt)
+
+        # create a handler to input
+        ch = logging.StreamHandler()
+        ch.setLevel(self.level_relations.get(level))
+        ch.setFormatter(format_str)
+
+        #create a handler to filer
+        fh = logging.FileHandler(filename=filename, mode='w')
+        fh.setLevel(self.level_relations.get(level))
+        fh.setFormatter(format_str)
+
+        self.logger.addHandler(ch)
+        self.logger.addHandler(fh)
+
+class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(
+        self,
+        optimizer,
+        milestones,
+        gamma=0.1,
+        warmup_factor=0.1,
+        warmup_iters=500,
+        warmup_method="linear",
+        last_epoch=-1,
+    ):
+        if not list(milestones) == sorted(milestones):
+            raise ValueError(
+                "Milestones should be a list of" " increasing integers. Got {}",
+                milestones,
+            )
+ 
+        if warmup_method not in ("constant", "linear"):
+            raise ValueError(
+                "Only 'constant' or 'linear' warmup_method accepted"
+                "got {}".format(warmup_method)
+            )
+        self.milestones = milestones
+        self.gamma = gamma
+        self.warmup_factor = warmup_factor
+        self.warmup_iters = warmup_iters
+        self.warmup_method = warmup_method
+        super(WarmupMultiStepLR, self).__init__(optimizer, last_epoch)
+ 
+    def get_lr(self):
+        warmup_factor = 1
+        if self.last_epoch < self.warmup_iters:
+            if self.warmup_method == "constant":
+                warmup_factor = self.warmup_factor
+            elif self.warmup_method == "linear":
+                alpha = self.last_epoch / self.warmup_iters
+                warmup_factor = self.warmup_factor * (1 - alpha) + alpha
+        return [base_lr* warmup_factor*self.gamma ** bisect_right(self.milestones, self.last_epoch)  for base_lr in self.base_lrs]
+

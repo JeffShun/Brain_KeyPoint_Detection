@@ -3,10 +3,7 @@
 import argparse
 import os
 import sys
-
 import torch
-from mmcv import Config
-from starship.umtf.common.model import build_network
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
 import custom  # noqa: F401

@@ -37,9 +37,9 @@ class SamplingBCELoss(nn.Module):
         self.bceloss = torch.nn.BCEWithLogitsLoss(reduce=False)
     
     def forward(self, inputs, targets):
-        targets_sum = torch.sum(targets, 1, keepdim=True).view(N, 1, -1)
         shape_ = targets.shape
         N, C = shape_[0], shape_[1]
+        targets_sum = torch.sum(targets, 1, keepdim=True).view(N, 1, -1)
         inputs = inputs.view(N, C, -1)
         targets = targets.view(N, C, -1)
         loss_all = self.bceloss(inputs, targets)
@@ -62,17 +62,18 @@ class SamplingBCELoss(nn.Module):
 
 class CompeteLoss(nn.Module):
     def __init__(self):
-        super(SamplingBCELoss, self).__init__()
+        super(CompeteLoss, self).__init__()
         self.sigmoid = nn.Sigmoid()
     
     def forward(self, inputs, targets):
         inputs = self.sigmoid(inputs)
-        targets_sum = torch.sum(targets, 1, keepdim=True).view(N, 1, -1)
         N, C = targets.shape[0], targets.shape[1]
+        targets_sum = torch.sum(targets, 1, keepdim=True).view(N, 1, -1)
         inputs = inputs.view(N, C, -1)
         targets = targets.view(N, C, -1)
         P1 = torch.sum(inputs * targets, -1)
         P2 = torch.sum(inputs * targets_sum, -1)
         P = P1/P2+1e-24
         competeloss = -((1-P)**2)*torch.log(P+1e-24)
+        competeloss = competeloss.mean()
         return competeloss

@@ -16,9 +16,9 @@ from infer.predictor import DetectKeypointModel, DetectKeypointPredictor
 def parse_args():
     parser = argparse.ArgumentParser(description='Test DetectKeypoint')
 
-    parser.add_argument('--gpu', default=0, type=int)
-    parser.add_argument('--input_dicom_path', default='./data/input/dicom', type=str)
-    parser.add_argument('--output_path', default='./data/output', type=str)
+    parser.add_argument('--device', default="cuda:0", type=str)
+    parser.add_argument('--input_dicom_path', default='../example/data/input', type=str)
+    parser.add_argument('--output_path', default='../example/data/output', type=str)
     parser.add_argument(
         '--model_path',
         default=glob.glob("./data/model/*.tar")[0] if len(glob.glob("./data/model/*.tar")) > 0 else None,
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument(
         '--model_file',
         type=str,
-        default='../train/checkpoints/v1/epoch_1.pth'
+        default='../train/checkpoints/v1/10.pth'
         # default=None
     )
     parser.add_argument(
@@ -53,7 +53,7 @@ def load_scans(dcm_path):
     return sitk_img
 
 
-def main(input_dicom_path, output_path, gpu, args):
+def main(input_dicom_path, output_path, device, args):
     # TODO: 适配参数输入
     if (
         args.model_file is not None and 
@@ -64,7 +64,7 @@ def main(input_dicom_path, output_path, gpu, args):
             config_f=args.config_file,
         )
         predictor_detect_keypoint = DetectKeypointPredictor(
-            gpu=gpu,
+            device=device,
             model=model_detect_keypoint,
         )
     else:
@@ -75,24 +75,21 @@ def main(input_dicom_path, output_path, gpu, args):
                 config_f=tar.extractfile(tar.getmember('detect_keypoint.yaml')),
             )
             predictor_detect_keypoint = DetectKeypointPredictor(
-                gpu=gpu,
+                device=device,
                 model=model_detect_keypoint,
             )
 
     os.makedirs(output_path, exist_ok=True)
 
     for pid in tqdm(os.listdir(input_dicom_path)):
-        try:
-            sitk_img = load_scans(os.path.join(input_dicom_path, pid))
-            volume = sitk.GetArrayFromImage(sitk_img)
-        
-            pred_array = inference(predictor_detect_keypoint, volume)
-            keypoint_itk = sitk.GetImageFromArray(pred_array)
-            keypoint_itk.CopyInformation(sitk_img)
-            sitk.WriteImage(keypoint_itk, os.path.join(output_path, f'{pid}-kp.nii.gz'))
-        except:  
-            traceback.print_exc()
-            break
+
+        sitk_img = sitk.ReadImage(os.path.join(input_dicom_path, pid))
+        volume = sitk.GetArrayFromImage(sitk_img).astype('float32')
+        pred_array = inference(predictor_detect_keypoint, volume)
+        keypoint_itk = sitk.GetImageFromArray(pred_array)
+        keypoint_itk.CopyInformation(sitk_img)
+        sitk.WriteImage(keypoint_itk, os.path.join(output_path, f'{pid}-kp.nii.gz'))
+
 
 
 if __name__ == '__main__':
@@ -100,6 +97,6 @@ if __name__ == '__main__':
     main(
         input_dicom_path=args.input_dicom_path,
         output_path=args.output_path,
-        gpu=args.gpu,
+        device=args.device,
         args=args,
     )

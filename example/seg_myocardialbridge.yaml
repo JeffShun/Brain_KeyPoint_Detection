@@ -1,4 +1,0 @@
-win_level: 300
-win_width: 800
-patch_size: [128, 128, 128]
-th_prob: 0.45

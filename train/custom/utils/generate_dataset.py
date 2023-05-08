@@ -40,8 +40,8 @@ def gen_lst(tgt_path, task, processed_pids):
 
 
 def seg2point(seg, n):
-    for i in range(1,n+1):
-        points = np.zeros_like(seg)
+    points = np.zeros_like(seg)
+    for i in range(1,n+1): 
         loc = np.array(list(zip(*np.where(seg==i))))
         loc_center = np.mean(loc, 0)
         loc_center = tuple((loc_center + 0.5).astype(np.int64))
@@ -51,34 +51,32 @@ def seg2point(seg, n):
 
 def process_single(input):
     seg_path, dcm_path, tgt_path, pid = input
-    img_itk = load_scans(dcm_path)
+    img_itk = sitk.ReadImage(dcm_path)
     seg_itk = sitk.ReadImage(seg_path)
     if img_itk.GetSize() == seg_itk.GetSize():
-        try:
-            img = sitk.GetArrayFromImage(img_itk)
-            seg = sitk.GetArrayFromImage(seg_itk)
-            mask = seg2point(seg).astype('uint8')
-            np.savez_compressed(os.path.join(tgt_path, f'{pid}.npz'), img=img, mask=mask)
-        except:
-            print(pid)
+        img = sitk.GetArrayFromImage(img_itk)
+        seg = sitk.GetArrayFromImage(seg_itk)
+        mask = seg2point(seg, 5).astype('uint8')
+        np.savez_compressed(os.path.join(tgt_path, f'{pid}.npz'), img=img, mask=mask)
+
 
 
 if __name__ == '__main__':
     args = parse_args()
     src_path = args.src_path
-    for task in ["train", "val"]:
+    for task in ["train", "valid"]:
         print("\nBegin gen %s data!"%(task))
-        src_dicom_path = os.path.join(args.src_path, task, "dcm")
-        src_seg_path = os.path.join(args.src_path, task, "seg")
+        src_dicom_path = os.path.join(args.src_path, task, "dcm_nii")
+        src_seg_path = os.path.join(args.src_path, task, "seg_nii")
         tgt_path = args.tgt_path
         os.makedirs(tgt_path, exist_ok=True)
         inputs = []
         for pid in tqdm(os.listdir(src_seg_path)):
             seg_path = os.path.join(src_seg_path, pid)           
-            pid = pid.replace('-seg.nii.gz', '')
+            pid = pid.replace('.seg.nii.gz', '')
             dcm_path = os.path.join(src_dicom_path, pid)
             inputs.append([seg_path, dcm_path, tgt_path, pid])
-        processed_pids = [pid.replace('-seg.nii.gz', '') for pid in os.listdir(src_seg_path)]
+        processed_pids = [pid.replace('.seg.nii.gz', '') for pid in os.listdir(src_seg_path)]
         pool = Pool(8)
         pool.map(process_single, inputs)
         pool.close()
