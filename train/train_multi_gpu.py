@@ -80,10 +80,10 @@ def train():
                                 last_epoch=network_cfg.last_epoch)
 
     time_start=time.time()
-    net.train()
     for epoch in range(network_cfg.total_epochs): 
         train_sampler.set_epoch(epoch)
         #Training Step!
+        net.train()
         for ii, (train_data, train_label) in enumerate(train_dataloader):
             train_data = V(train_data.float()).to(device)
             train_label = V(train_label.float()).to(device)
@@ -113,6 +113,7 @@ def train():
         # Valid Step!
         if (epoch+1) % network_cfg.valid_interval == 0:
             valid_loss = dict()
+            net.eval()
             for ii, (valid_data,valid_label) in enumerate(valid_dataloader):
                 valid_data = V(valid_data.float()).to(device)
                 valid_label = V(valid_label.float()).to(device)

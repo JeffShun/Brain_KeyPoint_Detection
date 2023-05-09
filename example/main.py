@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument(
         '--model_file',
         type=str,
-        default='../train/checkpoints/v1/100.pth'
+        default='../train/checkpoints/v1/30.pth'
         # default=None
     )
     parser.add_argument(
