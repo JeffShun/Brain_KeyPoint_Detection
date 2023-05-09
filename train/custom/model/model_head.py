@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import List
 
 class Model_Head(nn.Module):
 
     def __init__(
         self,
         in_channels: int,
-        point_radius: int,
+        point_radius: List[int],
         num_class: int
     ):
         super(Model_Head, self).__init__()
@@ -23,11 +23,14 @@ class Model_Head(nn.Module):
         return self.conv(inputs)
 
     def loss(self, inputs, targets):
-        targets = F.max_pool3d(targets, kernel_size=self.point_radius*2+1, stride=1, padding=self.point_radius)
-        kp_area_loss = self.kp_area_loss(inputs, targets)
-        kp_compete_loss = self.kp_compete_loss(inputs, targets)
-        return {"kp_area_loss": kp_area_loss, "kp_compete_loss":kp_compete_loss}
-
+        # 3 scale 监督
+        kp_area_loss = []
+        kp_compete_loss = []
+        for point_radiu in self.point_radius:
+            targets_dilate = F.max_pool3d(targets, kernel_size=point_radiu*2+1, stride=1, padding=point_radiu)
+            kp_area_loss.append(self.kp_area_loss(inputs, targets_dilate))
+            kp_compete_loss.append(self.kp_compete_loss(inputs, targets_dilate))
+        return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss)}
 
 class KPAreaLoss(nn.Module):
     def __init__(self):
