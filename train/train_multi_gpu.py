@@ -16,6 +16,7 @@ import torch.distributed as dist
 
 # CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 --use_env train_multi_gpu.py
 
+os.makedirs(network_cfg.checkpoints_dir,exist_ok=True)
 logger_dir = network_cfg.log_dir
 os.makedirs(logger_dir, exist_ok=True)
 for file in os.listdir(logger_dir):
@@ -133,7 +134,6 @@ def train():
                 logger.info('Validating Step:\t {}'.format(loss_info))
                
         if (epoch+1) % network_cfg.checkpoint_save_interval == 0:
-            os.makedirs(network_cfg.checkpoints_dir,exist_ok=True)
             torch.save(net.module.state_dict(), network_cfg.checkpoints_dir+"/{}.pth".format(epoch+1))
 
     # 删除临时缓存文件
@@ -141,6 +141,7 @@ def train():
         if os.path.exists(init_weight):
             os.remove(init_weight)
     cleanup()
+    writer.close()
 
 if __name__ == '__main__':
 	train()

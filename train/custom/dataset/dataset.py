@@ -43,8 +43,6 @@ class MyDataset(data.Dataset):
         cropped_img = cropped_img[np.newaxis,:,:,:]
         if self._transforms:
             cropped_img, cropped_mask = self._transforms(cropped_img, cropped_mask)
-        # 把点膨胀为高斯球
-        cropped_mask = GeneralTools.gaussian_smooth3d(cropped_mask, kernel_size=5, sigma=5.0)
         return cropped_img, cropped_mask
 
 

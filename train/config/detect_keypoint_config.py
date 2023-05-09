@@ -1,7 +1,7 @@
 import sys, os
 work_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(work_dir)
-from custom.model.backbones.ResUnet_refine import *
+from custom.model.backbones.ResUnet_SPP import *
 from custom.model.model_head import *
 from custom.model.model_network import *
 from custom.utils.common_tools import *
@@ -14,8 +14,8 @@ class network_cfg:
 
     # network
     network = Model_Network(
-        backbone = ResUnet_refine(in_ch=1,channels=32, blocks=3),
-        head = Model_Head(in_channels=32,scale_factor=(2.0, 2.0, 2.0),num_class=5),
+        backbone = ResUnet_SPP(in_ch=1,channels=16, blocks=3),
+        head = Model_Head(in_channels=80,point_radius=2,num_class=5),
         apply_sync_batchnorm=False,
     )
 
@@ -28,9 +28,9 @@ class network_cfg:
             to_tensor(),
             normlize(win_clip=win_clip),
             random_rotate3d(prob=0.5,
-                            x_theta_range=[-30,30],
-                            y_theta_range=[-30,30],
-                            z_theta_range=[-30,30]),
+                            x_theta_range=[-20,20],
+                            y_theta_range=[-20,20],
+                            z_theta_range=[-20,20]),
             resize(patch_size)
             ])
         )
@@ -56,7 +56,7 @@ class network_cfg:
     weight_decay = 1e-4
 
     # scheduler
-    milestones = [50,100]
+    milestones = [50,90]
     gamma = 0.1
     warmup_factor = 0.1
     warmup_iters = 50
@@ -68,7 +68,7 @@ class network_cfg:
     log_dir = work_dir + "/Logs"
     checkpoints_dir = work_dir + '/checkpoints/v1'
     checkpoint_save_interval = 2
-    total_epochs = 10
+    total_epochs = 100
     load_from = ''
 
     # others

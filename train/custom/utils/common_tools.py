@@ -107,7 +107,16 @@ class random_rotate3d(object):
             random_angle_y = random.random()*(self.y_theta_range[1]-self.y_theta_range[0])+self.y_theta_range[0]
             random_angle_z = random.random()*(self.z_theta_range[1]-self.z_theta_range[0])+self.z_theta_range[0]    
             img_o = self._rotate3d(img,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="bilinear")
-            mask_o = self._rotate3d(mask,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="nearest")
+            mask_o = self._rotate3d(mask,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="bilinear")
+            # 如果关键点旋转到边界以外，则不做旋转直接返回
+            if torch.any(torch.sum(mask_o, (1,2,3))==0):
+                return img, mask
+            # 插值之后，mask的一个点可能会变成很多点，需要处理一下
+            _shape = mask_o.shape
+            mask_flatten = mask_o.view(_shape[0], -1)
+            mask_zero = torch.zeros_like(mask_flatten, dtype=torch.float32)
+            mask_zero[(torch.arange(_shape[0]), mask_flatten.max(dim=1, keepdim=False)[1])]=1
+            mask_o = mask_zero.view(_shape)
         return img_o, mask_o
 
 class resize(object):
@@ -116,9 +125,15 @@ class resize(object):
 
     def __call__(self, img, mask):
         img_o = torch.nn.functional.interpolate(img[None], size=self.size, mode="trilinear") 
-        mask_o = torch.nn.functional.interpolate(mask[None], size=self.size, mode="nearest")
+        mask_o = torch.nn.functional.interpolate(mask[None], size=self.size, mode="trilinear")
         img_o = img_o.squeeze(0)
         mask_o = mask_o.squeeze(0)
+        # 插值之后，mask的一个点可能会变成很多点，需要处理一下
+        _shape = mask_o.shape
+        mask_flatten = mask_o.view(_shape[0], -1)
+        mask_zero = torch.zeros_like(mask_flatten, dtype=torch.float32)
+        mask_zero[(torch.arange(_shape[0]), mask_flatten.max(dim=1, keepdim=False)[1])]=1
+        mask_o = mask_zero.view(_shape)
         return img_o, mask_o
         
 

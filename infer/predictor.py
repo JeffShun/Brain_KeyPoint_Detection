@@ -81,7 +81,7 @@ class DetectKeypointPredictor:
         return zmin, zmax, ymin, ymax, xmin, xmax
 
     def predict(self, volume: np.ndarray):
-        bbox = self._get_bbox(volume, (10, 10, 10))
+        bbox = self._get_bbox(volume, (2, 2, 2))
         volume_crop = volume[bbox[0]: bbox[1], bbox[2]: bbox[3], bbox[4]: bbox[5]]
         keypoint_pred  = self._forward(volume_crop)
         res_pred = np.zeros(volume.shape, dtype='uint8')
@@ -91,6 +91,7 @@ class DetectKeypointPredictor:
     def _forward(self, volume: np.ndarray):
         shape = volume.shape
         volume = torch.from_numpy(volume).float()[None, None]
+        volume = self._normlize(volume)
         volume = self._resize_torch(volume, self.test_cfg.patch_size)
 
         with torch.no_grad():
@@ -108,9 +109,15 @@ class DetectKeypointPredictor:
             kp_mask = kp_mask.reshape(ori_shape)
             out_mask = np.zeros(shape, dtype="uint8")
             for i in range(kp_mask.shape[0]):
-                kp_dilate = dilation(kp_mask[i], np.ones([5, 5, 5]))
+                kp_dilate = dilation(kp_mask[i], np.ones([3, 3, 3]))
                 out_mask[kp_dilate==1] = i+1
         return out_mask
+
+    def _normlize(self, data, win_clip=None):
+        if win_clip is not None:
+            data = torch.clip(data, win_clip[0], win_clip[1])
+        data = (data - data.min())/(data.max() - data.min())
+        return data 
 
     def _resize_torch(self, data, scale, mode="trilinear"):
         return torch.nn.functional.interpolate(data, size=scale, mode=mode)    

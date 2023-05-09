@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import SimpleITK as sitk
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-from common_tools import GeneralTools,random_rotate3d
+from common_tools import *
 
 def _rotate3d(data, angles=[0,0,0], itp_mode="bilinear"):
     alpha, beta, gama = [(angle/180)*math.pi for angle in angles]
@@ -32,6 +32,15 @@ def _rotate3d(data, angles=[0,0,0], itp_mode="bilinear"):
     output = output[:,pad_x:output.shape[1]-pad_x, pad_y:output.shape[2]-pad_y, pad_z:output.shape[3]-pad_z]
     return output
 
+def crop_data(img, mask):
+    shape = img.shape
+    loc = np.where(img!=0)
+    zmin, zmax, ymin, ymax, xmin, xmax = np.min(loc[0]), np.max(loc[0]), np.min(loc[1]), np.max(loc[1]), np.min(loc[2]), np.max(loc[2])
+    zmin, ymin, xmin = [max(0, v - 2 ) for v in[zmin, ymin, xmin]]
+    zmax, ymax, xmax = [min(sc, v + 2) for v, sc in zip([zmax, ymax, xmax], shape)]
+    img_patch =  img[zmin: zmax, ymin: ymax, xmin: xmax]
+    mask_patch = mask[zmin: zmax, ymin: ymax, xmin: xmax]
+    return img_patch, mask_patch
 
 if __name__ == "__main__":
     # input_data = np.ones((100,150,80))
@@ -52,22 +61,33 @@ if __name__ == "__main__":
     # plt.subplot(224)
     # plt.imshow(output3.squeeze().numpy()[60, :, :], cmap='gray')
     # plt.show()
-    f = random_rotate3d(prob=0.5,x_theta_range=[-30,30],y_theta_range=[-30,30],z_theta_range=[-30,30])
     file_name = "../../train_data/processed_data/50793.npz"
     data = np.load(file_name, allow_pickle=True)
     org_img = data['img']
     org_mask = data['mask']
-    org_img, org_mask = f(torch.from_numpy(org_img[np.newaxis,:,:,:].astype("float32")), torch.from_numpy(org_mask[np.newaxis,:,:,:].astype("float32")))
-    org_img = org_img.numpy().squeeze(0)
-    org_mask = org_mask.numpy().squeeze(0)
-    img_itk = sitk.GetImageFromArray(org_img)
+    cropped_img, cropped_mask = crop_data(org_img, org_mask)
+    cropped_mask = GeneralTools.mask_to_onehot(cropped_mask, 5)
+    # transform前，数据必须转化为[C,H,D,W]的形状
+    cropped_img = cropped_img[np.newaxis,:,:,:]
+    transforms = Compose([
+        to_tensor(),
+        normlize(win_clip=None),
+        random_rotate3d(prob=1,
+                        x_theta_range=[-20,20],
+                        y_theta_range=[-20,20],
+                        z_theta_range=[-20,20]),
+        resize((64,160,160))
+        ])
+    cropped_img, cropped_mask = transforms(cropped_img, cropped_mask)
+    cropped_img = cropped_img.numpy().squeeze(0)
+    img_itk = sitk.GetImageFromArray(cropped_img)
     sitk.WriteImage(img_itk,"./dcm.nii.gz")
-    mask = GeneralTools.mask_to_onehot(org_mask, 5)
-    mask = torch.from_numpy(mask).float()
-    mask = GeneralTools.gaussian_smooth3d(mask, kernel_size=5, sigma=5.0)
-    out = torch.zeros_like(mask[0])
+    
+    cropped_mask = GeneralTools.gaussian_smooth3d(cropped_mask, kernel_size=5, sigma=5.0)
+    out = torch.zeros_like(cropped_mask[0])
     for i in range(5):
-        out[mask[i]>0] = i+1
+        out[cropped_mask[i]>0] = i+1
     out = out.numpy().astype("uint8")
+    print(cropped_img.shape,out.shape)
     out = sitk.GetImageFromArray(out)
     sitk.WriteImage(out,"./seg.nii.gz")
