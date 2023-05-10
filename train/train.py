@@ -31,16 +31,16 @@ def train():
     net.train()
     train_dataset = network_cfg.train_dataset
     train_dataloader = DataLoader(train_dataset, 
-                                  batch_size=network_cfg.batchsize, 
-                                  shuffle=network_cfg.shuffle,
-                                  num_workers=network_cfg.num_workers, 
-                                  drop_last=network_cfg.drop_last)
+                                batch_size=network_cfg.batchsize, 
+                                shuffle=network_cfg.shuffle,
+                                num_workers=network_cfg.num_workers, 
+                                drop_last=network_cfg.drop_last)
     valid_dataset = network_cfg.valid_dataset
     valid_dataloader = DataLoader(valid_dataset, 
-                                  batch_size=network_cfg.batchsize, 
-                                  shuffle=False,
-                                  num_workers=network_cfg.num_workers, 
-                                  drop_last=network_cfg.drop_last)
+                                batch_size=network_cfg.batchsize, 
+                                shuffle=False,
+                                num_workers=network_cfg.num_workers, 
+                                drop_last=network_cfg.drop_last)
     
     optimizer = optim.Adam(params=net.parameters(), lr=network_cfg.lr, weight_decay=network_cfg.weight_decay)
     scheduler = WarmupMultiStepLR(optimizer=optimizer,

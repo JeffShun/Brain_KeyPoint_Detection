@@ -3,8 +3,8 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
 import custom  # noqa: F401
 
-version = "v8_r4_2"
-test_epochs = range(72,100,1)
+version = "v1"
+test_epochs = range(50,100,2)
 out_dir = "../example/data/%s_output"%(version)
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)

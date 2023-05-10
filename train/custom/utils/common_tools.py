@@ -95,11 +95,11 @@ class random_gamma_transform(object):
 
 class random_rotate3d(object):
     def __init__(self,
-                 x_theta_range=[-180,180], 
-                 y_theta_range=[-180,180], 
-                 z_theta_range=[-180,180],
-                 prob=0.5, 
-                 ):
+                x_theta_range=[-180,180], 
+                y_theta_range=[-180,180], 
+                z_theta_range=[-180,180],
+                prob=0.5, 
+                ):
         self.prob = prob
         self.x_theta_range = x_theta_range
         self.y_theta_range = y_theta_range
@@ -214,7 +214,7 @@ class Logger(object):
     }
 
     def __init__(self,filename, level='info',
-                 fmt='%(asctime)s - %(levelname)s : %(message)s'):
+                fmt='%(asctime)s - %(levelname)s : %(message)s'):
         #create a logger
         self.logger = logging.getLogger()
         self.logger.setLevel(self.level_relations.get(level))
@@ -249,7 +249,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
                 "Milestones should be a list of" " increasing integers. Got {}",
                 milestones,
             )
- 
+
         if warmup_method not in ("constant", "linear"):
             raise ValueError(
                 "Only 'constant' or 'linear' warmup_method accepted"
@@ -261,7 +261,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
         self.warmup_iters = warmup_iters
         self.warmup_method = warmup_method
         super(WarmupMultiStepLR, self).__init__(optimizer, last_epoch)
- 
+
     def get_lr(self):
         warmup_factor = 1
         if self.last_epoch < self.warmup_iters:
