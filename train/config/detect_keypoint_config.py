@@ -27,10 +27,11 @@ class network_cfg:
         transforms = Compose([
             to_tensor(),
             normlize(win_clip=win_clip),
-            random_rotate3d(prob=0.5,
-                            x_theta_range=[-20,20],
+            random_rotate3d(x_theta_range=[-20,20],
                             y_theta_range=[-20,20],
-                            z_theta_range=[-20,20]),
+                            z_theta_range=[-20,20],
+                            prob=0.5),
+            random_gamma_transform(gamma_range=[0.8,1.2], prob=0.5),
             resize(patch_size)
             ])
         )

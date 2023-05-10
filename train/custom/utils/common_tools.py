@@ -60,17 +60,45 @@ class random_flip(object):
         self.axis = axis
         self.prob = prob
     def __call__(self, img, mask):
+        img_o, mask_o = img, mask
         if random.random() < self.prob:
             img_o = torch.flip(img, axis=self.axis)
             mask_o = torch.flip(mask, axis=self.axis)
         return img_o, mask_o
 
+class random_contrast(object):
+    def __init__(self, alpha_range=[0.8, 1.2], prob=0.5):
+        self.alpha_range = alpha_range
+        self.prob = prob
+    def __call__(self, img, mask):
+        img_o, mask_o = img, mask
+        if random.random() < self.prob:
+            alpha = random.uniform(self.alpha_range[0], self.alpha_range[1])
+            mean_val = torch.mean(img, (1,2,3), keepdim=True)
+            img_o = mean_val + alpha * (img - mean_val)
+            img_o = torch.clip(img_o, 0.0, 1.0)
+        return img_o, mask_o
+
+class random_gamma_transform(object):
+    """
+    input must be normlized before gamma transform
+    """
+    def __init__(self, gamma_range=[0.8, 1.2], prob=0.5):
+        self.gamma_range = gamma_range
+        self.prob = prob
+    def __call__(self, img, mask):
+        img_o, mask_o = img, mask
+        if random.random() < self.prob:
+            gamma = random.uniform(self.gamma_range[0], self.gamma_range[1])
+            img_o = img**gamma
+        return img_o, mask_o
+
 class random_rotate3d(object):
     def __init__(self,
-                 prob=0.5, 
                  x_theta_range=[-180,180], 
                  y_theta_range=[-180,180], 
-                 z_theta_range=[-180,180]
+                 z_theta_range=[-180,180],
+                 prob=0.5, 
                  ):
         self.prob = prob
         self.x_theta_range = x_theta_range
@@ -103,9 +131,9 @@ class random_rotate3d(object):
     def __call__(self, img, mask):
         img_o, mask_o = img, mask
         if random.random() < self.prob:
-            random_angle_x = random.random()*(self.x_theta_range[1]-self.x_theta_range[0])+self.x_theta_range[0]
-            random_angle_y = random.random()*(self.y_theta_range[1]-self.y_theta_range[0])+self.y_theta_range[0]
-            random_angle_z = random.random()*(self.z_theta_range[1]-self.z_theta_range[0])+self.z_theta_range[0]    
+            random_angle_x = random.uniform(self.x_theta_range[0], self.x_theta_range[1])
+            random_angle_y = random.uniform(self.y_theta_range[0], self.y_theta_range[1])
+            random_angle_z = random.uniform(self.z_theta_range[0], self.z_theta_range[1]) 
             img_o = self._rotate3d(img,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="bilinear")
             mask_o = self._rotate3d(mask,angles=[random_angle_x,random_angle_y,random_angle_z],itp_mode="bilinear")
             # 如果关键点旋转到边界以外，则不做旋转直接返回

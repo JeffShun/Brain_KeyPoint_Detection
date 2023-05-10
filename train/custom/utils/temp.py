@@ -43,24 +43,6 @@ def crop_data(img, mask):
     return img_patch, mask_patch
 
 if __name__ == "__main__":
-    # input_data = np.ones((100,150,80))
-    # input_data[0:80,0:80,0:80] = 0.75
-    # input_data[0:60,0:60,0:60] = 0.5
-    # input_data[0:40,0:40,0:40] = 0.25
-    # input_data = np.pad(input_data, ((10, 10), (10, 10), (10, 10)), 'constant', constant_values=((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)))
-    # data = torch.from_numpy(input_data).unsqueeze(0)
-    # output1 = _rotate3d(data, [0,0,90])
-    # output2 = _rotate3d(data, [0,0,60])
-    # output3 = _rotate3d(data, [0,90,0])
-    # plt.subplot(221)
-    # plt.imshow(input_data[60, :, :], cmap='gray')
-    # plt.subplot(222)
-    # plt.imshow(output1.squeeze().numpy()[60, :, :], cmap='gray')
-    # plt.subplot(223)
-    # plt.imshow(output2.squeeze().numpy()[60, :, :], cmap='gray')
-    # plt.subplot(224)
-    # plt.imshow(output3.squeeze().numpy()[60, :, :], cmap='gray')
-    # plt.show()
     file_name = "../../train_data/processed_data/50793.npz"
     data = np.load(file_name, allow_pickle=True)
     org_img = data['img']
@@ -72,10 +54,11 @@ if __name__ == "__main__":
     transforms = Compose([
         to_tensor(),
         normlize(win_clip=None),
-        random_rotate3d(prob=1,
-                        x_theta_range=[-20,20],
+        random_rotate3d(x_theta_range=[-20,20],
                         y_theta_range=[-20,20],
-                        z_theta_range=[-20,20]),
+                        z_theta_range=[-20,20],
+                        prob=1),
+        random_gamma_transform(gamma_range=[0.8,1.2], prob=1),
         resize((64,160,160))
         ])
     cropped_img, cropped_mask = transforms(cropped_img, cropped_mask)
@@ -88,6 +71,5 @@ if __name__ == "__main__":
     for i in range(5):
         out[cropped_mask[i]>0] = i+1
     out = out.numpy().astype("uint8")
-    print(cropped_img.shape,out.shape)
     out = sitk.GetImageFromArray(out)
     sitk.WriteImage(out,"./seg.nii.gz")

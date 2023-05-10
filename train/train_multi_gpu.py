@@ -38,8 +38,7 @@ def train():
     # 如果存在预训练权重则载入
     if os.path.exists(network_cfg.load_from):
         weights_dict = torch.load(weights_path, map_location=device)
-        load_weights_dict = {k: v for k, v in weights_dict.items()
-                             if model.state_dict()[k].numel() == v.numel()}
+        load_weights_dict = {k: v for k, v in weights_dict.items() if model.state_dict()[k].numel() == v.numel()}
         net.load_state_dict(load_weights_dict, strict=False)
     else:
         # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致
@@ -55,21 +54,21 @@ def train():
     train_dataset = network_cfg.train_dataset
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=network_cfg.shuffle)
     train_dataloader = DataLoader(dataset = train_dataset, 
-                                  batch_size=network_cfg.batchsize, 
-                                  num_workers=network_cfg.num_workers,
-                                  sampler = train_sampler,
-                                  drop_last=network_cfg.drop_last
-                                  )               
+                                batch_size=network_cfg.batchsize, 
+                                num_workers=network_cfg.num_workers,
+                                sampler = train_sampler,
+                                drop_last=network_cfg.drop_last
+                                )               
                     
     valid_dataset = network_cfg.valid_dataset
     valid_sampler = torch.utils.data.distributed.DistributedSampler(valid_dataset, shuffle=False)
     valid_dataloader = DataLoader(dataset = valid_dataset, 
-                                  batch_size=network_cfg.batchsize, 
-                                  num_workers=network_cfg.num_workers, 
-                                  sampler = valid_sampler,
-                                  drop_last=False
-                                  )
-                                  
+                                batch_size=network_cfg.batchsize, 
+                                num_workers=network_cfg.num_workers, 
+                                sampler = valid_sampler,
+                                drop_last=False
+                                )
+
     optimizer = optim.Adam(params=net.parameters(), lr=network_cfg.lr, weight_decay=network_cfg.weight_decay)
     scheduler = WarmupMultiStepLR(optimizer=optimizer,
                                 milestones=network_cfg.milestones,
@@ -133,7 +132,7 @@ def train():
                     writer.add_scalar('ValidLoss/{}'.format(loss_item),loss_val.item(), (epoch+1)*len(train_dataloader))
             if rank == 0:
                 logger.info('Validating Step:\t {}'.format(loss_info))
-               
+        
         if (epoch+1) % network_cfg.checkpoint_save_interval == 0:
             torch.save(net.module.state_dict(), network_cfg.checkpoints_dir+"/{}.pth".format(epoch+1))
 
