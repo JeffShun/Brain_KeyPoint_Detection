@@ -21,7 +21,10 @@ logger_dir = network_cfg.log_dir
 os.makedirs(logger_dir, exist_ok=True)
 for file in os.listdir(logger_dir):
     if file.startswith("events.out.tfevents"):
-        os.remove(logger_dir+"/"+file)
+        try:
+            os.remove(logger_dir+"/"+file)
+        except:
+            pass
 logger = Logger(logger_dir+"/train.log", level='debug').logger
 writer = SummaryWriter(logger_dir)
 
