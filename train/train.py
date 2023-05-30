@@ -25,7 +25,8 @@ writer = SummaryWriter(logger_dir)
 
 def train():
     net = network_cfg.network.cuda()
-    # net = torch.nn.DataParallel(net, device_ids=[0, 1, 2, 3])
+    # 定义损失函数
+    loss_f = network_cfg.loss_f
     if os.path.exists(network_cfg.load_from):
         net.load_state_dict(torch.load(network_cfg.load_from))
     net.train()
@@ -57,7 +58,8 @@ def train():
             train_data = V(train_data.float()).cuda()
             train_label = V(train_label.float()).cuda()
             optimizer.zero_grad()
-            t_loss = net(train_data, train_label)
+            t_out = net(train_data)
+            t_loss = loss_f(t_out, train_label)
             loss_all = V(torch.zeros(1)).cuda()
             loss_info = ""
             for loss_item, loss_val in t_loss.items():
@@ -83,7 +85,8 @@ def train():
                 valid_data = V(valid_data.float()).cuda()
                 valid_label = V(valid_label.float()).cuda()
                 with torch.no_grad():
-                    v_loss = net(valid_data, valid_label)
+                    v_out = net(valid_data)
+                    v_loss = loss_f(v_out, valid_label)
                 loss_all = V(torch.zeros(1)).cuda()
                 for loss_item, loss_val in v_loss.items():
                     if loss_item not in valid_loss:

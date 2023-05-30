@@ -12,7 +12,6 @@ from tqdm import tqdm
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from infer.predictor import DetectKeypointModel, DetectKeypointPredictor
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Test DetectKeypoint')
 
@@ -27,7 +26,7 @@ def parse_args():
     parser.add_argument(
         '--model_file',
         type=str,
-        default='../train/checkpoints/v1/100.pth'
+        default='../train/checkpoints/v1/model_trt.pth'
         # default=None
     )
     parser.add_argument(
@@ -71,7 +70,7 @@ def main(input_dicom_path, output_path, device, args):
         with tarfile.open(args.model_path, 'r') as tar:
             files = tar.getnames()
             model_detect_keypoint = DetectKeypointModel(
-                model_f=tar.extractfile(tar.getmember('detect_keypoint.pt')),
+                model_f=tar.extractfile(tar.getmember('detect_keypoint.pth')),
                 config_f=tar.extractfile(tar.getmember('detect_keypoint.yaml')),
             )
             predictor_detect_keypoint = DetectKeypointPredictor(
@@ -81,8 +80,12 @@ def main(input_dicom_path, output_path, device, args):
 
     os.makedirs(output_path, exist_ok=True)
     for pid in tqdm(os.listdir(input_dicom_path)):
-        sitk_img = sitk.ReadImage(os.path.join(input_dicom_path, pid))
-        pid = pid.replace(".nii.gz","")
+        pid_path = os.path.join(input_dicom_path, pid)
+        if os.path.isdir(pid_path):
+            sitk_img = load_scans(pid_path)
+        elif pid_path.endswith(".nii.gz"):
+            sitk_img = sitk.ReadImage(pid_path)
+            pid = pid.replace(".nii.gz","")
         volume = sitk.GetArrayFromImage(sitk_img).astype('float32')
         pred_array = inference(predictor_detect_keypoint, volume)
         keypoint_itk = sitk.GetImageFromArray(pred_array)

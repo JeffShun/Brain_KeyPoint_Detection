@@ -14,6 +14,7 @@ from scipy.ndimage import zoom
 from scipy.ndimage.filters import gaussian_filter
 from skimage.morphology import dilation
 from train.config.detect_keypoint_config import network_cfg
+from torch2trt import TRTModule
 
 
 class DetectKeypointConfig:
@@ -44,28 +45,17 @@ class DetectKeypointPredictor:
         with open(self.model.config_f, 'r') as config_f:
             self.test_cfg = DetectKeypointConfig(yaml.safe_load(config_f))
         self.network_cfg = model.network_cfg
-        self.load_model()
+        self.load_model_pth()
 
-    def load_model(self) -> None:
-        if isinstance(self.model.model_f, str):
-            # 根据后缀判断类型
-            if self.model.model_f.endswith('.pth'):
-                self.load_model_pth()
-            else:
-                self.load_model_jit()
-
-    def load_model_jit(self) -> None:
-        # 加载静态图
-        from torch import jit
-        self.net = jit.load(self.model.model_f, map_location=self.device)
-        self.net.eval()
-        self.net.to(self.device).half()
-
-    def load_model_pth(self) -> None:
-        # 加载动态图
-        self.net = self.network_cfg.network
-        checkpoint = torch.load(self.model.model_f, map_location=self.device)
-        self.net.load_state_dict(checkpoint)
+    def load_model_pth(self) -> None: 
+        try:
+            self.net = TRTModule()
+            checkpoint = torch.load(self.model.model_f, map_location=self.device)
+            self.net.load_state_dict(checkpoint)
+        except:
+            self.net = self.network_cfg.network
+            checkpoint = torch.load(self.model.model_f, map_location=self.device)
+            self.net.load_state_dict(checkpoint)            
         self.net.eval()
         self.net.to(self.device).half()
 
@@ -96,7 +86,7 @@ class DetectKeypointPredictor:
 
         with torch.no_grad():
             patch_gpu = volume.half().to(self.device)
-            kp_heatmap = self.net.forward_test(patch_gpu)
+            kp_heatmap = self.net(patch_gpu)
             kp_heatmap = self._resize_torch(kp_heatmap, shape)
             kp_arr = kp_heatmap.squeeze().cpu().detach().numpy()
             ori_shape = kp_arr.shape
@@ -109,7 +99,7 @@ class DetectKeypointPredictor:
             kp_mask = kp_mask.reshape(ori_shape)
             out_mask = np.zeros(shape, dtype="uint8")
             for i in range(kp_mask.shape[0]):
-                kp_dilate = dilation(kp_mask[i], np.ones([3, 3, 3]))
+                kp_dilate = dilation(kp_mask[i], np.ones([4, 4, 4]))
                 out_mask[kp_dilate==1] = i+1
         return out_mask
 

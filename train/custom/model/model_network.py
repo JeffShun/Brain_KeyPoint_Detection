@@ -19,19 +19,10 @@ class Model_Network(nn.Module):
         if apply_sync_batchnorm:
             self._apply_sync_batchnorm()
 
-    @torch.jit.ignore
-    def forward(self, input_img, input_mask):
-        outs = self.backbone(input_img)
-        head_outs = self.head(outs)
-        loss = self.head.loss(head_outs, input_mask)
-        return loss
-
-    @torch.jit.export
-    def forward_test(self, img):
+    def forward(self, img):
         outs = self.backbone(img)
         head_outs = self.head(outs)
         return head_outs
-
 
     def initialize_weights(self):
         for m in self.modules():

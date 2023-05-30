@@ -15,9 +15,12 @@ class network_cfg:
     # network
     network = Model_Network(
         backbone = ResUnet_SPP(in_ch=1,channels=16, blocks=3),
-        head = Model_Head(in_channels=80,point_radius=[1,2,4],num_class=5),
+        head = Model_Head(in_channels=80, num_class=5),
         apply_sync_batchnorm=False,
     )
+
+    # loss function
+    loss_f = MergeLoss(point_radius=[1,2,4])
 
     # dataset
     train_dataset = MyDataset(

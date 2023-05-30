@@ -33,6 +33,8 @@ def train():
     init_distributed_mode(network_cfg)
     rank = network_cfg.rank
     device = torch.device(network_cfg.device)
+    # 定义损失函数
+    loss_f = network_cfg.loss_f
     # 学习率要根据并行GPU的数量进行倍增
     network_cfg.lr *= network_cfg.world_size  
     net = network_cfg.network.to(device)
@@ -80,7 +82,7 @@ def train():
                                 warmup_iters=network_cfg.warmup_iters,
                                 warmup_method=network_cfg.warmup_method,
                                 last_epoch=network_cfg.last_epoch)
-
+    
     time_start=time.time()
     for epoch in range(network_cfg.total_epochs): 
         train_sampler.set_epoch(epoch)
@@ -90,7 +92,8 @@ def train():
             train_data = V(train_data.float()).to(device)
             train_label = V(train_label.float()).to(device)
             optimizer.zero_grad()
-            t_loss = net(train_data, train_label)
+            t_out = net(train_data)
+            t_loss = loss_f(t_out, train_label)
             loss_all = V(torch.zeros(1)).to(device)
             loss_info = ""
             for loss_item, loss_val in t_loss.items():
@@ -120,7 +123,8 @@ def train():
                 valid_data = V(valid_data.float()).to(device)
                 valid_label = V(valid_label.float()).to(device)
                 with torch.no_grad():
-                    v_loss = net(valid_data, valid_label)
+                    v_out = net(valid_data)
+                    v_loss = loss_f(v_out, valid_label)
                 loss_all = V(torch.zeros(1)).to(device)
                 for loss_item, loss_val in v_loss.items():
                     if loss_item not in valid_loss:
