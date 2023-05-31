@@ -18,16 +18,12 @@ def parse_args():
     parser.add_argument('--device', default="cuda:0", type=str)
     parser.add_argument('--input_dicom_path', default='../example/data/input/dcm', type=str)
     parser.add_argument('--output_path', default='../example/data/output', type=str)
-    parser.add_argument(
-        '--model_path',
-        default=glob.glob("./data/model/*.tar")[0] if len(glob.glob("./data/model/*.tar")) > 0 else None,
-        type=str,
-    )
+
     parser.add_argument(
         '--model_file',
         type=str,
-        default='../train/checkpoints/v1/model_trt.pth'
-        # default=None
+        # default='../train/checkpoints/trt_model/model.engine'
+        default='../train/checkpoints/v1/200.pth'
     )
     parser.add_argument(
         '--config_file',
@@ -43,7 +39,6 @@ def inference(predictor: DetectKeypointPredictor, volume: np.ndarray):
     pred_array = predictor.predict(volume)
     return pred_array
 
-
 def load_scans(dcm_path):
     reader = sitk.ImageSeriesReader()
     name = reader.GetGDCMSeriesFileNames(dcm_path)
@@ -51,32 +46,16 @@ def load_scans(dcm_path):
     sitk_img = reader.Execute()
     return sitk_img
 
-
 def main(input_dicom_path, output_path, device, args):
     # TODO: 适配参数输入
-    if (
-        args.model_file is not None and 
-        args.config_file is not None
-    ):
-        model_detect_keypoint = DetectKeypointModel(
-            model_f=args.model_file,
-            config_f=args.config_file,
-        )
-        predictor_detect_keypoint = DetectKeypointPredictor(
-            device=device,
-            model=model_detect_keypoint,
-        )
-    else:
-        with tarfile.open(args.model_path, 'r') as tar:
-            files = tar.getnames()
-            model_detect_keypoint = DetectKeypointModel(
-                model_f=tar.extractfile(tar.getmember('detect_keypoint.pth')),
-                config_f=tar.extractfile(tar.getmember('detect_keypoint.yaml')),
-            )
-            predictor_detect_keypoint = DetectKeypointPredictor(
-                device=device,
-                model=model_detect_keypoint,
-            )
+    model_detect_keypoint = DetectKeypointModel(
+        model_f=args.model_file,
+        config_f=args.config_file,
+    )
+    predictor_detect_keypoint = DetectKeypointPredictor(
+        device=device,
+        model=model_detect_keypoint,
+    )
 
     os.makedirs(output_path, exist_ok=True)
     for pid in tqdm(os.listdir(input_dicom_path)):

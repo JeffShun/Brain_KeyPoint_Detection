@@ -72,7 +72,7 @@ class network_cfg:
     log_dir = work_dir + "/Logs"
     checkpoints_dir = work_dir + '/checkpoints/v1'
     checkpoint_save_interval = 2
-    total_epochs = 100
+    total_epochs = 200
     load_from = ''
 
     # others
