@@ -1,21 +1,54 @@
+## 模型介绍
+
+整个模型是基于heatmap回归的关键点预测模型，backbone为ResUnet3D_SPP，在ResUnet3D的基础上引入多尺度金字塔特征融合提高模型效果，损失函数采用region_based focal_loss 加上region_based competition_loss
+
 ## 文件结构说明
 
-- train.py: 单卡训练代码入口
+### 训练文件目录
 
-- train_multi_gpu.py: 分布式训练代码入口
+- train/train.py: 单卡训练代码入口
+- train/train_multi_gpu.py: 分布式训练代码入口
+- train/custom/dataset/dataset.py: dataset类
+- train/custom/model/model_network.py: 模型网络
+- train/custom/model/model_head.py: 模型head
+- train/custom/model/backbones/ResUnet_SPP.py:  模型backbone
+- train/custom/utils/generate_dataset.py: 从原始数据生成输入到模型的数据，供custom/dataset/dataset.py使用
+- train/custom/utils/save_torchscript.py: 生成模型对应的静态图
+- train/custom/utils/convert_rt.py: pytorch模型转tensorrt
+- train/custom/utils/nrrd2nii.py: nrrd格式文件转dcm_nii脚本
+- train/custom/utils/common_tools.py: 工具函数包，提供损失函数，数据增强和一些其它工具函数
+- train/custom/utils/distributed_utils.py: 分布式训练工具函数
+- train/custom/utils/cal_precision.py: 统计模型结果的准确率
+- train/custom/utils/test_script.py: 循环遍历各epoch模型，打印评估指标
+- train/config/detect_keypoint_config.py: 训练的配置文件
 
-- ./custom/dataset/dataset.py: dataset类
+### 预测文件目录
 
-- ./custom/model/model_network.py: 模型head文件
+* exmple/detect_keypoint.yaml: 预测配置文件
+* exmple/main.py: 预测入口文件
+* infer/predictor.py: 模型预测具体实现，包括加载模型和后处理
 
-- ./custom/model/model_head.py: 整个网络部分，训练阶段构建模型，forward方法输出loss的dict
+## demo调用方法
 
-- ./custom/utils/generate_dataset.py: 从原始数据生成输入到模型的数据，供custom/dataset/dataset.py使用
+1. 准备训练原始数据
 
-- ./custom/utils/save_torchscript.py: 生成模型对应的静态图
+   * 在train文件夹下新建train_data/origin_data文件夹，将训练集和验证集分别放入train、valid文件夹
+2. 生成处理后的训练数据，在train_data/processed_data文件夹下
 
-- ./custom/utils/common_tools.py: 工具函数包
+   * cd train
+   * python custom/utils/generate_dataset.py
+3. 开始训练
 
-- ./custom/utils/distributed_utils.py: 分布式训练函数包
+   * 分布式训练：CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 --use_env train_multi_gpu.py
+   * 单卡训练：python train.py
+4. 准备测试数据
 
-- ./config/detect_keypoint_config.py: 训练的配置文件
+   * 将预测数据放入example/data/input目录
+5. 开始预测
+
+   * cd example
+   * python main.py
+6. 结果评估
+
+   * cd train/cd custom/utils/
+   * python cal_precision.py
