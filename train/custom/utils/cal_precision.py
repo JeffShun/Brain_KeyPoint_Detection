@@ -49,14 +49,6 @@ def cal_dist(pred_img, label_img):
         dists.append(dist)
     return dists
 
-def seg2point(seg, n):
-    points = np.zeros_like(seg)
-    for i in range(1,n+1): 
-        loc = np.array(list(zip(*np.where(seg==i))))
-        loc_center = np.mean(loc, 0)
-        loc_center = tuple((loc_center + 0.5).astype(np.int64))
-        points[loc_center] = i
-    return points
 
 def multiprocess_pipe(input):
     p_f, l_f = input
