@@ -57,14 +57,14 @@ class normlize(object):
 
 class random_flip(object):
     def __init__(self, axis=0, prob=0.5):
-        assert isinstance(axis, int) and axis in [1,2,3]
+        assert isinstance(axis, int) and axis in [0,1,2]
         self.axis = axis
         self.prob = prob
     def __call__(self, img, mask):
         img_o, mask_o = img, mask
         if random.random() < self.prob:
-            img_o = torch.flip(img, axis=self.axis)
-            mask_o = torch.flip(mask, axis=self.axis)
+            img_o = torch.flip(img, [self.axis])
+            mask_o = torch.flip(mask, [self.axis])
         return img_o, mask_o
 
 class random_contrast(object):
@@ -142,10 +142,10 @@ class random_rotate3d(object):
                 return img, mask
             # 插值之后，mask的一个点可能会变成很多点，需要处理一下
             _shape = mask_o.shape
-            mask_flatten = mask_o.view(_shape[0], -1)
+            mask_flatten = mask_o.reshape(_shape[0], -1)
             mask_zero = torch.zeros_like(mask_flatten, dtype=torch.float32)
             mask_zero[(torch.arange(_shape[0]), mask_flatten.max(dim=1, keepdim=False)[1])]=1
-            mask_o = mask_zero.view(_shape)
+            mask_o = mask_zero.reshape(_shape)
         return img_o, mask_o
 
 class resize(object):

@@ -188,7 +188,7 @@ class DetectKeypointPredictor:
         kp_mask = kp_mask.reshape(ori_shape)
         out_mask = np.zeros(shape, dtype="uint8")
         for i in range(kp_mask.shape[0]):
-            kp_dilate = dilation(kp_mask[i], np.ones([4, 4, 4]))
+            kp_dilate = dilation(kp_mask[i], np.ones([2, 4, 4]))
             out_mask[kp_dilate==1] = i+1
         return out_mask
 

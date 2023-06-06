@@ -21,7 +21,7 @@ def load_model(model_path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default='./checkpoints/v1/200.pth')
+    parser.add_argument('--model_path', type=str, default='./checkpoints/v1/100.pth')
     parser.add_argument('--output_onnx', type=str, default='./checkpoints/onnx_model')
     parser.add_argument('--output_trt', type=str, default='./checkpoints/trt_model')
     args = parser.parse_args()

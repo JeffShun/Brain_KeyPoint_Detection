@@ -52,7 +52,7 @@ class network_cfg:
     # dataloader
     batchsize = 4
     shuffle = True
-    num_workers = 8
+    num_workers = 4
     drop_last = False
 
     # optimizer
@@ -60,7 +60,7 @@ class network_cfg:
     weight_decay = 1e-4
 
     # scheduler
-    milestones = [50,90]
+    milestones = [50,150]
     gamma = 0.1
     warmup_factor = 0.1
     warmup_iters = 50
