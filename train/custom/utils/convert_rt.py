@@ -12,7 +12,7 @@ from config.detect_keypoint_config import network_cfg
 
 def load_model(model_path):
     model = network_cfg.network
-    checkpoint = torch.load(model_path)
+    checkpoint = torch.load(model_path, map_location={"cuda:0":"cuda:0","cuda:1":"cuda:0","cuda:2":"cuda:0","cuda:3":"cuda:0"})
     model.load_state_dict(checkpoint)
     model = model.cuda()
     model.eval()
