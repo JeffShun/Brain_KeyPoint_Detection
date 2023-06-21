@@ -1,6 +1,6 @@
 ## 模型介绍
 
-整个模型是基于heatmap回归的关键点预测模型，backbone为ResUnet3D_SPP，在ResUnet3D的基础上引入多尺度金字塔特征融合提高模型效果，损失函数采用region_based focal_loss 加上region_based competition_loss
+整个模型是基于heatmap回归的关键点预测模型，backbone为Cascaded_ResUnet3D_SPP，在ResUnet3D的基础上引入级联结构和多尺度金字塔特征，corse-to-fine检测关键点的精确位置，损失函数采用region_based focal_loss 加上region_based competition_loss
 
 ## 文件结构说明
 
@@ -11,7 +11,7 @@
 - train/custom/dataset/dataset.py: dataset类
 - train/custom/model/model_network.py: 模型网络
 - train/custom/model/model_head.py: 模型head
-- train/custom/model/backbones/ResUnet_SPP.py:  模型backbone
+- train/custom/model/backbones/Cascaded_ResUnet_SPP.py:  模型backbone
 - train/custom/utils/generate_dataset.py: 从原始数据生成输入到模型的数据，供custom/dataset/dataset.py使用
 - train/custom/utils/save_torchscript.py: 生成模型对应的静态图
 - train/custom/utils/convert_rt.py: pytorch模型转tensorrt
