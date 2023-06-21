@@ -74,7 +74,7 @@ if __name__ == '__main__':
         for pid in tqdm(os.listdir(src_seg_path)):
             seg_path = os.path.join(src_seg_path, pid)           
             pid = pid.replace('.seg.nii.gz', '')
-            dcm_path = os.path.join(src_dicom_path, pid)
+            dcm_path = os.path.join(src_dicom_path, pid+".dcm.nii.gz")
             inputs.append([seg_path, dcm_path, tgt_path, pid])
         processed_pids = [pid.replace('.seg.nii.gz', '') for pid in os.listdir(src_seg_path)]
         pool = Pool(8)

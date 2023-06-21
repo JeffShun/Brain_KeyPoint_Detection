@@ -16,14 +16,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Test DetectKeypoint')
 
     parser.add_argument('--device', default="cuda:0", type=str)
-    parser.add_argument('--input_dicom_path', default='../example/data/input/dcm', type=str)
-    parser.add_argument('--output_path', default='../example/data/output', type=str)
+    parser.add_argument('--input_dicom_path', default='../example/data/input_test/dcm', type=str)
+    parser.add_argument('--output_path', default='../example/data/output_test', type=str)
 
     parser.add_argument(
         '--model_file',
         type=str,
-        default='../train/checkpoints/trt_model/model.engine'
-        # default='../train/checkpoints/v1/100.pth'
+        # default='../train/checkpoints/trt_model/model.engine'
+        default='../train/checkpoints/v1/200.pth'
     )
     parser.add_argument(
         '--config_file',
@@ -69,7 +69,9 @@ def main(input_dicom_path, output_path, device, args):
         pred_array = inference(predictor_detect_keypoint, volume)
         keypoint_itk = sitk.GetImageFromArray(pred_array)
         keypoint_itk.CopyInformation(sitk_img)
-        sitk.WriteImage(keypoint_itk, os.path.join(output_path, f'{pid}.seg.nii.gz'))
+        os.makedirs(os.path.join(output_path, pid), exist_ok=True)
+        sitk.WriteImage(keypoint_itk, os.path.join(output_path, pid, f'{pid}.seg.nii.gz'))
+        sitk.WriteImage(sitk_img, os.path.join(output_path, pid, f'{pid}.dcm.nii.gz'))
 
 
 

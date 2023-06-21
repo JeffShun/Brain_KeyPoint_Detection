@@ -1,7 +1,7 @@
 import sys, os
 work_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(work_dir)
-from custom.model.backbones.ResUnet_SPP import *
+from custom.model.backbones.Cascaded_ResUnet_SPP import *
 from custom.model.model_head import *
 from custom.model.model_network import *
 from custom.utils.common_tools import *
@@ -14,13 +14,13 @@ class network_cfg:
 
     # network
     network = Model_Network(
-        backbone = ResUnet_SPP(in_ch=1,channels=16, blocks=3),
-        head = Model_Head(in_channels=80, num_class=5),
+        backbone = Cascaded_ResUnet_SPP(in_ch=1,channels=12, blocks=3),
+        head = Model_Head(in_channels=12, num_class=5),
         apply_sync_batchnorm=False,
     )
 
     # loss function
-    loss_f = MergeLoss(point_radius=[1,2,4])
+    loss_f = MergeLoss(point_radius=[3, 1])
 
     # dataset
     train_dataset = MyDataset(
@@ -50,7 +50,7 @@ class network_cfg:
         )
     
     # dataloader
-    batchsize = 4
+    batchsize = 3
     shuffle = True
     num_workers = 4
     drop_last = False
@@ -68,7 +68,7 @@ class network_cfg:
     last_epoch = -1
 
     # debug
-    valid_interval = 5
+    valid_interval = 2
     log_dir = work_dir + "/Logs"
     checkpoints_dir = work_dir + '/checkpoints/v1'
     checkpoint_save_interval = 2

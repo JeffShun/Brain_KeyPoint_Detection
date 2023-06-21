@@ -281,13 +281,15 @@ class MergeLoss(nn.Module):
         self.point_radius = point_radius
 
     def forward(self, inputs, targets):
-        # 3 scale 监督
+        # 2 scale 监督
         kp_area_loss = []
         kp_compete_loss = []
-        for point_radiu in self.point_radius:
+        for i, point_radiu in enumerate(self.point_radius):
+            n_scale = len(self.point_radius)
             targets_dilate = F.max_pool3d(targets, kernel_size=point_radiu*2+1, stride=1, padding=point_radiu)
-            kp_area_loss.append(self.kp_area_loss(inputs, targets_dilate))
-            kp_compete_loss.append(self.kp_compete_loss(inputs, targets_dilate))
+            w = (i+1) / ((1 + n_scale) * n_scale / 2)
+            kp_area_loss.append(w * self.kp_area_loss(inputs[i], targets_dilate))
+            kp_compete_loss.append(w * self.kp_compete_loss(inputs[i], targets_dilate))
         return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss)}
 
     def kp_compete_loss(self,inputs, targets):

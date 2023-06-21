@@ -37,13 +37,12 @@ class MyDataset(data.Dataset):
         data = np.load(file_name, allow_pickle=True)
         org_img = data['img']
         org_mask = data['mask']
-        cropped_img, cropped_mask = self.crop_data(org_img, org_mask)
-        cropped_mask = GeneralTools.mask_to_onehot(cropped_mask, 5)
+        mask = GeneralTools.mask_to_onehot(org_mask, 5)
         # transform前，数据必须转化为[C,H,D,W]的形状
-        cropped_img = cropped_img[np.newaxis,:,:,:]
+        img = org_img[np.newaxis,:,:,:]
         if self._transforms:
-            cropped_img, cropped_mask = self._transforms(cropped_img, cropped_mask)
-        return cropped_img, cropped_mask
+            img, mask = self._transforms(img, mask)
+        return img, mask
 
 
     def crop_data(self, img, mask):

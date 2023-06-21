@@ -137,12 +137,8 @@ class DetectKeypointPredictor:
         return zmin, zmax, ymin, ymax, xmin, xmax
 
     def predict(self, volume: np.ndarray):
-        bbox = self._get_bbox(volume, (2, 2, 2))
-        volume_crop = volume[bbox[0]: bbox[1], bbox[2]: bbox[3], bbox[4]: bbox[5]]
-        keypoint_pred  = self._forward(volume_crop)
-        res_pred = np.zeros(volume.shape, dtype='uint8')
-        res_pred[bbox[0]: bbox[1], bbox[2]: bbox[3], bbox[4]: bbox[5]] = keypoint_pred
-        return res_pred
+        keypoint_pred  = self._forward(volume)
+        return keypoint_pred
 
     def _forward(self, volume: np.ndarray):
         shape = volume.shape
@@ -167,17 +163,16 @@ class DetectKeypointPredictor:
             if cuda_ctx:
                 cuda_ctx.pop()
             shape_of_output = [1, 5, 64, 160, 160]
-            kp_heatmap = trt_outputs[0].reshape(shape_of_output)
-            kp_heatmap = self._resize_torch(torch.from_numpy(kp_heatmap), shape)
-            kp_arr = kp_heatmap.squeeze().numpy()
+            kp_heatmap = trt_outputs[1].reshape(shape_of_output)
+            kp_heatmap = torch.from_numpy(kp_heatmap)
         else:
             # pytorch预测
             with torch.no_grad():
                 patch_gpu = volume.half().to(self.device)
-                kp_heatmap = self.net(patch_gpu)
-                kp_heatmap = self._resize_torch(kp_heatmap, shape)
-                kp_arr = kp_heatmap.squeeze().cpu().detach().numpy()
+                _, kp_heatmap = self.net(patch_gpu)
 
+        kp_heatmap = self._resize_torch(kp_heatmap, shape)
+        kp_arr = kp_heatmap.squeeze().cpu().detach().numpy()
         ori_shape = kp_arr.shape
         C = ori_shape[0]
         kp_arr = kp_arr.reshape(C,-1)
@@ -200,3 +195,9 @@ class DetectKeypointPredictor:
 
     def _resize_torch(self, data, scale, mode="trilinear"):
         return torch.nn.functional.interpolate(data, size=scale, mode=mode)    
+    
+    def _mean_blur(self, img, kernel_size=3):  
+        img = torch.from_numpy(img).unsqueeze(0).float()
+        pool = torch.nn.AvgPool3d(kernel_size=kernel_size, stride=1, padding=kernel_size//2)
+        out = pool(img)
+        return out.squeeze(0).numpy()
