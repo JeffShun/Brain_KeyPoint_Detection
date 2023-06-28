@@ -284,13 +284,15 @@ class MergeLoss(nn.Module):
         # 2 scale 监督
         kp_area_loss = []
         kp_compete_loss = []
+        direction_loss = []
         for i, point_radiu in enumerate(self.point_radius):
             n_scale = len(self.point_radius)
             targets_dilate = F.max_pool3d(targets, kernel_size=point_radiu*2+1, stride=1, padding=point_radiu)
             w = (i+1) / ((1 + n_scale) * n_scale / 2)
             kp_area_loss.append(w * self.kp_area_loss(inputs[i], targets_dilate))
             kp_compete_loss.append(w * self.kp_compete_loss(inputs[i], targets_dilate))
-        return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss)}
+            direction_loss.append(w * self.direction_loss(inputs[i],targets))    
+        return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss), "direction_loss":sum(direction_loss)}
 
     def kp_compete_loss(self,inputs, targets):
         input_flatten = torch.flatten(inputs, start_dim=2, end_dim=-1)
@@ -309,3 +311,48 @@ class MergeLoss(nn.Module):
         p = (input_flatten_softmax * target_flatten).sum(dim=2)
         loss = -((1-p)**2)*torch.log(p+1e-24)
         return loss.mean()        
+    
+    def direction_loss(self, inputs, targets):
+        loss = []
+        max_points_inputs = self._argmax(inputs, soft=True)
+        max_points_targets = self._argmax(targets, soft=False)
+        vector_inputs_15 = max_points_inputs[:,4,:]-max_points_inputs[:,0,:]
+        vector_inputs_13 = max_points_inputs[:,2,:]-max_points_inputs[:,0,:]
+        norm_vec_inputs_cross = F.normalize(torch.cross(vector_inputs_15, vector_inputs_13, dim=-1) ,dim=-1)
+
+        vector_targets_15 = max_points_targets[:,4,:]-max_points_targets[:,0,:]
+        vector_targets_13 = max_points_targets[:,2,:]-max_points_targets[:,0,:]
+        norm_vec_targets_cross = F.normalize(torch.cross(vector_targets_15, vector_targets_13, dim=-1),dim=-1)  
+        loss.append(1-F.cosine_similarity(norm_vec_inputs_cross, norm_vec_targets_cross))
+
+        norm_vector_inputs_45 = F.normalize(max_points_inputs[:,4,:]-max_points_inputs[:,3,:], dim=-1)
+        norm_vector_targets_45 = F.normalize(max_points_targets[:,4,:]-max_points_targets[:,3,:],dim=-1)
+        loss.append(1-F.cosine_similarity(norm_vector_inputs_45, norm_vector_targets_45))
+        
+        norm_vector_inputs_23 = F.normalize(max_points_inputs[:,2,:]-max_points_inputs[:,1,:], dim=-1)
+        norm_vector_targets_23 = F.normalize(max_points_targets[:,2,:]-max_points_targets[:,1,:],dim=-1)
+        loss.append(1-F.cosine_similarity(norm_vector_inputs_23, norm_vector_targets_23))
+        return sum(loss).mean()
+
+    def _argmax(self, inputs, soft=True):
+        # 对输入进行softmax操作
+        input_flatten = torch.flatten(inputs, start_dim=2, end_dim=-1)
+        if soft:
+            input_flatten = F.softmax(input_flatten, -1)
+
+        grid_x = torch.linspace(-1, 1, inputs.size(2), device=inputs.device)
+        grid_y = torch.linspace(-1, 1, inputs.size(3), device=inputs.device)
+        grid_z = torch.linspace(-1, 1, inputs.size(4), device=inputs.device)
+
+        # 生成位置索引的网格
+        grid_x, grid_y, grid_z = torch.meshgrid(grid_x, grid_y, grid_z)
+
+        grid_x = grid_x.reshape(1, 1, -1).float()
+        grid_y = grid_y.reshape(1, 1, -1).float()
+        grid_z = grid_z.reshape(1, 1, -1).float()
+
+        position_x = torch.sum(grid_x * input_flatten, dim=-1, keepdim=True)
+        position_y = torch.sum(grid_y * input_flatten, dim=-1, keepdim=True)
+        position_z = torch.sum(grid_z * input_flatten, dim=-1, keepdim=True)
+
+        return torch.cat((position_x, position_y, position_z), dim=-1)     

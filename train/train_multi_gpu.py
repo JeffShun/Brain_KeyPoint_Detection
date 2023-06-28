@@ -42,8 +42,10 @@ def train():
     init_weight = os.path.join(network_cfg.checkpoints_dir, "initial_weights.pt")
     # 如果存在预训练权重则载入
     if os.path.exists(network_cfg.load_from):
-        weights_dict = torch.load(weights_path, map_location=device)
-        load_weights_dict = {k: v for k, v in weights_dict.items() if model.state_dict()[k].numel() == v.numel()}
+        if rank == 0:
+            print("Load pretrain weight from: " + network_cfg.load_from)
+        weights_dict = torch.load(network_cfg.load_from, map_location=device)
+        load_weights_dict = {k: v for k, v in weights_dict.items() if net.state_dict()[k].numel() == v.numel()}
         net.load_state_dict(load_weights_dict, strict=False)
     else:
         # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致

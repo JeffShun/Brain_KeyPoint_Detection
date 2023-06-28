@@ -34,7 +34,7 @@ class network_cfg:
                             y_theta_range=[-20,20],
                             z_theta_range=[-20,20],
                             prob=0.5),
-            random_gamma_transform(gamma_range=[0.8,1.2], prob=0.5),
+            random_gamma_transform(gamma_range=[0.7,1.3], prob=0.5),
             resize(patch_size)
             ])
         )
@@ -56,11 +56,11 @@ class network_cfg:
     drop_last = False
 
     # optimizer
-    lr = 1e-4
-    weight_decay = 1e-4
+    lr = 1e-3
+    weight_decay = 5e-4
 
     # scheduler
-    milestones = [50,150]
+    milestones = [50,80]
     gamma = 0.1
     warmup_factor = 0.1
     warmup_iters = 50
@@ -70,10 +70,10 @@ class network_cfg:
     # debug
     valid_interval = 2
     log_dir = work_dir + "/Logs"
-    checkpoints_dir = work_dir + '/checkpoints/v1'
+    checkpoints_dir = work_dir + '/checkpoints/v2'
     checkpoint_save_interval = 2
-    total_epochs = 200
-    load_from = ''
+    total_epochs = 100
+    load_from = work_dir + '/checkpoints/v1/40.pth'
 
     # others
     device = 'cuda'
