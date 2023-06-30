@@ -94,6 +94,38 @@ class random_gamma_transform(object):
             img_o = img**gamma
         return img_o, mask_o
 
+class random_apply_mosaic(object):
+    def __init__(self, prob=0.2, mosaic_size=5, mosaic_num=2):
+        self.prob = prob
+        self.mosaic_size = mosaic_size
+        self.mosaic_num = mosaic_num
+
+    def __call__(self, img, mask):
+        img_o, mask_o = img, mask
+        if random.random() < self.prob:
+            n_channel, depth, height, width = img.shape
+            for i in range(self.mosaic_num):
+                x = torch.randint(0, depth - self.mosaic_size, (1,))
+                y = torch.randint(0, height - self.mosaic_size, (1,))
+                z = torch.randint(0, width - self.mosaic_size, (1,))
+                mosaic_block = 0.1*torch.rand_like(img[:, x:x+self.mosaic_size, y:y+self.mosaic_size, z:z+self.mosaic_size])
+                img_o[:, x:x+self.mosaic_size, y:y+self.mosaic_size, z:z+self.mosaic_size] = mosaic_block
+        return img_o, mask_o
+
+class random_add_gaussian_noise(object):
+    def __init__(self, prob=0.2, mean=0, std=1):
+        self.prob = prob
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, img, mask):
+        img_o, mask_o = img, mask
+        if random.random() < self.prob:
+            noise = torch.randn_like(img) * self.std + self.mean
+            noisy_image = img + noise
+            img_o = torch.clip(noisy_image, 0 , 1)
+        return img_o, mask_o
+
 class random_rotate3d(object):
     def __init__(self,
                 x_theta_range=[-180,180], 
@@ -291,8 +323,8 @@ class MergeLoss(nn.Module):
             w = (i+1) / ((1 + n_scale) * n_scale / 2)
             kp_area_loss.append(w * self.kp_area_loss(inputs[i], targets_dilate))
             kp_compete_loss.append(w * self.kp_compete_loss(inputs[i], targets_dilate))
-            direction_loss.append(w * self.direction_loss(inputs[i],targets))    
-        return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss), "direction_loss":sum(direction_loss)}
+            direction_loss.append(w * self.dense_direction_loss(inputs[i],targets))    
+        return {"kp_area_loss": sum(kp_area_loss) , "kp_compete_loss":sum(kp_compete_loss), "direction_loss":0.1*sum(direction_loss)}
 
     def kp_compete_loss(self,inputs, targets):
         input_flatten = torch.flatten(inputs, start_dim=2, end_dim=-1)
@@ -316,9 +348,9 @@ class MergeLoss(nn.Module):
         loss = []
         max_points_inputs = self._argmax(inputs, soft=True)
         max_points_targets = self._argmax(targets, soft=False)
-        vector_inputs_15 = max_points_inputs[:,4,:]-max_points_inputs[:,0,:]
-        vector_inputs_13 = max_points_inputs[:,2,:]-max_points_inputs[:,0,:]
-        norm_vec_inputs_cross = F.normalize(torch.cross(vector_inputs_15, vector_inputs_13, dim=-1) ,dim=-1)
+        vector_inputs_35 = max_points_inputs[:,4,:]-max_points_inputs[:,2,:]
+        vector_inputs_31 = max_points_inputs[:,0,:]-max_points_inputs[:,2,:]
+        norm_vec_inputs_cross = F.normalize(torch.cross(vector_inputs_35, vector_inputs_31, dim=-1) ,dim=-1)
 
         vector_targets_15 = max_points_targets[:,4,:]-max_points_targets[:,0,:]
         vector_targets_13 = max_points_targets[:,2,:]-max_points_targets[:,0,:]
@@ -332,6 +364,17 @@ class MergeLoss(nn.Module):
         norm_vector_inputs_23 = F.normalize(max_points_inputs[:,2,:]-max_points_inputs[:,1,:], dim=-1)
         norm_vector_targets_23 = F.normalize(max_points_targets[:,2,:]-max_points_targets[:,1,:],dim=-1)
         loss.append(1-F.cosine_similarity(norm_vector_inputs_23, norm_vector_targets_23))
+        return sum(loss).mean()
+
+    def dense_direction_loss(self, inputs, targets):
+        loss = []
+        max_points_inputs = self._argmax(inputs, soft=True)
+        max_points_targets = self._argmax(targets, soft=False)
+        for i in range(max_points_inputs.shape[1]-1):
+            for j in range(i, max_points_targets.shape[1]):
+                norm_vector_inputs = F.normalize(max_points_inputs[:,i,:]-max_points_inputs[:,j,:], dim=-1)
+                norm_vector_targets = F.normalize(max_points_targets[:,i,:]-max_points_targets[:,j,:],dim=-1)
+                loss.append(1-F.cosine_similarity(norm_vector_inputs, norm_vector_targets))
         return sum(loss).mean()
 
     def _argmax(self, inputs, soft=True):

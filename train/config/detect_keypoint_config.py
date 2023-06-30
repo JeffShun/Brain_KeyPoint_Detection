@@ -35,6 +35,8 @@ class network_cfg:
                             z_theta_range=[-20,20],
                             prob=0.5),
             random_gamma_transform(gamma_range=[0.7,1.3], prob=0.5),
+            random_apply_mosaic(prob=0.2, mosaic_size=40, mosaic_num=4),
+            random_add_gaussian_noise(prob=0.2, mean=0, std=0.02),
             resize(patch_size)
             ])
         )
@@ -52,7 +54,7 @@ class network_cfg:
     # dataloader
     batchsize = 3
     shuffle = True
-    num_workers = 4
+    num_workers = 8
     drop_last = False
 
     # optimizer
@@ -70,9 +72,9 @@ class network_cfg:
     # debug
     valid_interval = 2
     log_dir = work_dir + "/Logs"
-    checkpoints_dir = work_dir + '/checkpoints/v2'
+    checkpoints_dir = work_dir + '/checkpoints/v5'
     checkpoint_save_interval = 2
-    total_epochs = 100
+    total_epochs = 150
     load_from = work_dir + '/checkpoints/v1/40.pth'
 
     # others
